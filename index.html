@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Money Buckets - allocation visualizer</title>
+<meta name="description" content="Slide between cash, low, medium and extreme risk and see expected value and spread.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<h1>Money Buckets</h1>
+<p class="sub">Slide between cash, low, medium and extreme risk. See the expected value, the typical outcome, and the spread. Research dated September 23, 2026.</p>
+
+<div class="warn">This is a model for thinking, not a forecast or financial advice. Every return number below is an <b>assumption</b> you can edit. Real markets can do worse than the "bad" line. You make every money move yourself.</div>
+
+<section class="card">
+  <div class="row"><label for="start">Starting amount</label><input type="number" id="start" min="100" step="1000"></div>
+  <p class="note">Default $30k = $20k in the brokerage + $10k going to a HYSA. Your $30k living money in checking is not in here.</p>
+
+  <h3>Risk dial</h3>
+  <div class="row"><span class="note">One slider: safe to wild</span><span class="dialLabel" id="dialLabel"></span></div>
+  <input type="range" id="dial" min="0" max="100" step="1" aria-label="Risk dial">
+  <div class="bar" id="allocBar"></div>
+
+  <h3>Or set each bucket</h3>
+  <p class="note">Buckets always add to 100%. Move one and the others shrink or grow to fit.</p>
+  <div id="buckets"></div>
+</section>
+
+<section class="card">
+  <h2>What this mix does (under the assumptions)</h2>
+  <div class="stats">
+    <div class="stat"><small>Expected return / yr (mean)</small><b id="st-mu"></b></div>
+    <div class="stat"><small>Typical return / yr (median)</small><b id="st-med"></b></div>
+    <div class="stat"><small>Volatility / yr</small><b id="st-sig"></b></div>
+    <div class="stat"><small>Bad year, 1 in 10 (year 1)</small><b id="st-bad"></b></div>
+  </div>
+  <h3>Spread over time</h3>
+  <div class="row"><span class="note">Horizon</span><span id="hLabel">20 years</span></div>
+  <input type="range" id="horizon" min="5" max="30" step="1" value="20" aria-label="Horizon in years">
+  <svg id="chart" width="100%" role="img" aria-label="Fan chart of projected portfolio value"></svg>
+  <div class="legend">
+    <span><i style="background:#a371f7;opacity:.3"></i>10th to 90th percentile</span>
+    <span><i style="background:#a371f7;opacity:.6"></i>25th to 75th</span>
+    <span><i style="background:#e6edf3;height:3px"></i>Typical (median)</span>
+    <span><i style="background:#f0b72f;height:3px"></i>Expected value (mean)</span>
+    <span><i style="background:#8b949e;height:2px"></i>What you put in</span>
+  </div>
+  <div class="scroll"><table id="proj"></table></div>
+  <p class="note"><b>Expected value vs typical:</b> the mean gets pulled up by rare huge wins. The more extreme-risk you hold, the further the typical outcome falls below the expected value. With 100% extreme risk the model's EV looks great while the median is roughly flat and about half of paths lose money. That gap is the whole lesson of gambling money.</p>
+</section>
+
+<section class="card">
+  <h2>Example portfolios</h2>
+  <p class="note">Tap one to load it. Percentages are HYSA / low / medium / extreme. Dollar outcomes use your starting amount.</p>
+  <div class="presets" id="presets"></div>
+</section>
+
+<section class="card">
+  <h2>My pick for your $30k</h2>
+  <p>The "Sam's plan" preset. You wanted room to gamble, so the extreme sleeve is real, but capped so a total wipeout costs $3k, not your future.</p>
+  <div class="scroll"><table>
+    <tr><th>Where</th><th>What</th><th>Amount</th></tr>
+    <tr><td class="hysa">HYSA</td><td>CIT Bank Platinum Savings (4.10% APY on $5k+). Backup: Happen Bank 4.00%, no minimum.</td><td>$10,000</td></tr>
+    <tr><td class="low">Low risk</td><td>VOO (S&amp;P 500)</td><td>$8,000</td></tr>
+    <tr><td class="low">Low risk</td><td>SCHD (dividend payers)</td><td>$2,000</td></tr>
+    <tr><td class="low">Low risk</td><td>Costco (COST) $1k + Coca-Cola (KO) $1k, your "stuff everyone buys" picks</td><td>$2,000</td></tr>
+    <tr><td class="med">Medium risk</td><td>QQQ (Nasdaq-100)</td><td>$3,500</td></tr>
+    <tr><td class="med">Medium risk</td><td>SMH (semiconductors)</td><td>$1,500</td></tr>
+    <tr><td class="high">Extreme risk</td><td>Pick up to 3 from the extreme list below, about $1k each</td><td>$3,000</td></tr>
+    <tr><th>Total</th><th></th><th>$30,000</th></tr>
+  </table></div>
+  <p class="note">Rules that make this work: don't refill the extreme sleeve from the safe money when it drops. If it 5x's, take some off the table. VOO and VTI are near-identical; pick one, not both. Leveraged ETFs (TQQQ, SOXL) are built for day trading, not holding for years.</p>
+</section>
+
+<section class="card">
+  <h2>Assumptions</h2>
+  <p class="note">Edit these and everything above updates. Returns are nominal (before inflation and taxes), yearly. Buckets are assumed rebalanced yearly. Outcomes use a lognormal model fit to each mix's mean and volatility. Correlations: low/medium 0.85, low/extreme 0.6, medium/extreme 0.8, cash 0.</p>
+  <div class="scroll" id="assump"></div>
+  <button id="reset" class="preset" style="margin-top:10px;width:auto">Reset to defaults</button>
+  <h3>Why these numbers</h3>
+  <ul>
+    <li><b class="hysa">HYSA 4.0%, ~0% risk:</b> top online savings rates are 4.00-4.10% APY right now (Bankrate, updated Sept 20, 2026). Rates are variable and will drift down if the Fed cuts. FDIC insured up to $250k.</li>
+    <li><b class="low">Low risk 8% / 15%:</b> the S&amp;P 500 returned about 10.0% a year compounded from 1928-2025 (11.9% average year) with ~19% yearly swings, worst year -43.8% (Damodaran, NYU). This bucket mixes the index with lower-volatility staples (betas 0.2-0.6), and US stocks start from a high valuation (S&amp;P P/E ~27), so I shaded both return and volatility down.</li>
+    <li><b class="med">Medium risk 10% / 24%:</b> QQQ compounded ~10.9% a year since 1999 but fell -81% from 2000 to 2002 and -33% in 2022. Nasdaq-100 trailing P/E is ~31-33 and market concentration is near dot-com levels, so I didn't assume the 2010s boom repeats.</li>
+    <li><b class="high">Extreme risk 12% / 55%:</b> no clean history for "moonshots". US bottom-decile small caps averaged 17.8% a year but compounded only 12.0% with ~38% swings. Individual speculative names and 3x funds swing far more (betas 2-6). 55% volatility means the typical path goes nowhere while a few paths explode.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>Research: what goes in each bucket</h2>
+  <p class="note">Prices are the last close shown on stockanalysis.com when checked on Sept 23, 2026; the date each was captured is listed. They move daily.</p>
+
+  <h3 class="hysa">HYSA</h3>
+  <ul>
+    <li><b>CIT Bank Platinum Savings - 4.10% APY.</b> $100 to open, but the top rate only applies on balances of $5,000+. No monthly fee. FDIC. Your $10k clears the bar.</li>
+    <li><b>Happen Bank - 4.00% APY</b>, no minimum. Live Oak Bank 4.00%, no minimum. Accordia 4.00%, $100 min.</li>
+    <li>For contrast: Capital One 360 Performance Savings, where you already bank, pays 3.00%. That's about $110/yr less on $10k.</li>
+  </ul>
+
+  <h3 class="low">Low risk: stuff every American buys, plus the whole market</h3>
+  <div class="scroll"><table>
+    <tr><th>Ticker</th><th>What</th><th>Price (date)</th><th>Div yield</th><th>Beta</th><th>Why it's here</th></tr>
+    <tr><td>VOO</td><td>S&amp;P 500 ETF</td><td>$697.66 (9/15)</td><td>1.05%</td><td>1.01</td><td>500 biggest US companies, 0.03% fee. The default core.</td></tr>
+    <tr><td>VTI</td><td>Total US market ETF</td><td>$381.27 (9/22)</td><td>1.02%</td><td>1.02</td><td>Same idea as VOO plus small and mid caps. Pick one.</td></tr>
+    <tr><td>SCHD</td><td>US dividend ETF</td><td>$34.33 (9/15)</td><td>3.05%</td><td>0.70</td><td>~100 steady dividend payers, lower swings, 0.06% fee.</td></tr>
+    <tr><td>COST</td><td>Costco</td><td>$898.48 (9/21)</td><td>0.65%</td><td>0.86</td><td>Membership model, sticky customers. Catch: pricey at ~41x forward earnings, 18% below its 52-week high.</td></tr>
+    <tr><td>KO</td><td>Coca-Cola</td><td>$88.22 (9/15)</td><td>2.40%</td><td>0.34</td><td>Decades of dividend raises. Barely moves with the market.</td></tr>
+    <tr><td>PG</td><td>Procter &amp; Gamble</td><td>$146.39 (9/18)</td><td>2.98%</td><td>0.38</td><td>Tide, Charmin, Gillette. Long dividend-raise streak. People buy it in recessions too.</td></tr>
+    <tr><td>WMT</td><td>Walmart</td><td>$106.73 (9/18)</td><td>0.93%</td><td>0.59</td><td>Everyone shops there; trades at ~36x forward earnings, so not cheap.</td></tr>
+    <tr><td>JNJ</td><td>Johnson &amp; Johnson</td><td>$269.47 (9/21)</td><td>1.99%</td><td>0.23</td><td>Healthcare, lowest beta here. Long dividend-raise streak.</td></tr>
+  </table></div>
+  <p class="note">"Safe" here means lower swings, not "can't lose". Beta = how much it moves vs the market (1.0 = same).</p>
+
+  <h3 class="med">Medium risk: QQQ and tech ETFs</h3>
+  <div class="scroll"><table>
+    <tr><th>Ticker</th><th>What</th><th>Price (date)</th><th>Beta</th><th>Risk note</th></tr>
+    <tr><td>QQQ</td><td>Nasdaq-100 ETF</td><td>$707.64 (9/1)</td><td>1.23</td><td>~60% tech. -33% in 2022, -81% in 2000-02. Took ~15 years to recover from the dot-com top.</td></tr>
+    <tr><td>XLK</td><td>S&amp;P tech sector ETF</td><td>$188.44 (9/8)</td><td>1.35</td><td>More concentrated than QQQ: a few megacaps dominate. P/E ~37.</td></tr>
+    <tr><td>SMH</td><td>Semiconductor ETF</td><td>$560.28 (9/10)</td><td>1.73</td><td>The AI-chip trade. Only 26 holdings. Chips had ±5% days on a third of trading days this summer.</td></tr>
+    <tr><td>MSFT</td><td>Microsoft</td><td>$498.00 (9/22)</td><td>1.11</td><td>Profitable giant, ~25x forward. Single-stock risk.</td></tr>
+    <tr><td>NVDA</td><td>Nvidia</td><td>$212.17 (9/15)</td><td>2.22</td><td>~18x forward earnings but swings like a much smaller company.</td></tr>
+  </table></div>
+
+  <h3 class="high">Extreme risk: moonshots, "cheap" tech, and hyper-risky</h3>
+  <p><b>Moonshots / cheap tech</b></p>
+  <div class="scroll"><table>
+    <tr><th>Ticker</th><th>What</th><th>Price (date)</th><th>Beta</th><th>Risk note</th></tr>
+    <tr><td>RKLB</td><td>Rocket Lab (space)</td><td>$69.89 (9/21)</td><td>2.61</td><td>52-week range $37.57-$151. No earnings yet.</td></tr>
+    <tr><td>IONQ</td><td>IonQ (quantum computing)</td><td>$40.74 (9/22)</td><td>3.29</td><td>52-week range $25.89-$84.64. Unprofitable, story stock.</td></tr>
+    <tr><td>ARKK</td><td>ARK Innovation ETF</td><td>$88.23 (9/18)</td><td>2.00</td><td>Basket of disruptive bets, 0.75% fee. Beta 2: moves about twice the market.</td></tr>
+    <tr><td>PLTR</td><td>Palantir</td><td>$177.64 (9/18)</td><td>1.62</td><td>Real business, but ~94x forward earnings. Priced for perfection.</td></tr>
+  </table></div>
+  <p class="note">A low share price doesn't make a stock cheap. A $5 stock can be wildly overvalued; price per share tells you nothing without earnings.</p>
+  <p><b>Hyper-risky</b></p>
+  <div class="scroll"><table>
+    <tr><th>Ticker</th><th>What</th><th>Price (date)</th><th>Beta</th><th>Risk note</th></tr>
+    <tr><td>TQQQ</td><td>3x daily Nasdaq-100</td><td>$74.33 (8/10, stale)</td><td>3.71</td><td>Resets daily, so long holds decay in choppy markets (SEC warning). In a 2022-style year (QQQ -33%) it can lose most of its value.</td></tr>
+    <tr><td>SOXL</td><td>3x daily semiconductors</td><td>price not current</td><td>5.71</td><td>The most volatile thing on this page. Can halve in weeks.</td></tr>
+  </table></div>
+
+  <h3>Tech right now (Sept 2026), the honest read</h3>
+  <ul>
+    <li><b>Prices are near records again.</b> The Nasdaq-100 hit its first record since June this week, after a September sell-off. Half of one recent 5-day run came from just five stocks (Financial Post, Sept 23).</li>
+    <li><b>Valuations: expensive vs history, cheaper vs last year.</b> The S&amp;P tech sector's forward P/E fell from ~32 last October to ~21, because earnings grew faster than prices; tech earnings estimates rose ~20% in three months (Truist via Yahoo Finance, Sept 21). Nasdaq trailing P/E is still ~31.</li>
+    <li><b>Volatility is high.</b> UBS says US tech volatility is back to dot-com-bubble levels (semis ~69% annualized). iShares notes chips moved ±5% on a third of trading days in June-July.</li>
+    <li><b>Bubble debate is live.</b> Bears point to concentration and AI capex (UBS says hyperscalers are on track for over 30% of all US capex in 2026). Bulls point to real earnings growth. Reuters (Sept 17) argues the bulls have more data; the Motley Fool notes a dot-com-style pop could keep QQQ under water until ~2042.</li>
+    <li><b>So:</b> tech is a fair medium-risk bet for a long horizon, not a safe one. Buying in pieces over a few months cuts the regret if it drops right after you buy.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>Sources</h2>
+  <ul class="note">
+    <li>HYSA rates: <a href="https://www.bankrate.com/banking/savings/best-high-yield-interests-savings-accounts/">Bankrate, best HYSAs Sept 2026</a>; <a href="https://www.nerdwallet.com/banking/learn/capital-one-360-savings-account-interest-rate-how-it-compares">NerdWallet, Capital One 360 rate</a></li>
+    <li>S&amp;P 500 and small-cap history 1928-2025: <a href="https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/histretSP.html">Damodaran, NYU Stern</a></li>
+    <li>QQQ history: <a href="https://backtestportfolios.com/ticker/QQQ">backtestportfolios.com</a>; <a href="https://www.slickcharts.com/symbol/QQQ/returns">slickcharts QQQ returns</a></li>
+    <li>Leveraged ETF decay: <a href="https://www.sec.gov/investor/pubs/leveragedetfs-alert.htm">SEC investor alert</a></li>
+    <li>Prices, betas, P/E, yields: stockanalysis.com pages for <a href="https://stockanalysis.com/etf/voo/">VOO</a>, <a href="https://stockanalysis.com/etf/vti/">VTI</a>, <a href="https://stockanalysis.com/etf/schd/">SCHD</a>, <a href="https://stockanalysis.com/stocks/cost/">COST</a>, <a href="https://stockanalysis.com/stocks/ko/">KO</a>, <a href="https://stockanalysis.com/stocks/pg/">PG</a>, <a href="https://stockanalysis.com/stocks/wmt/">WMT</a>, <a href="https://stockanalysis.com/stocks/jnj/">JNJ</a>, <a href="https://stockanalysis.com/etf/qqq/">QQQ</a>, <a href="https://stockanalysis.com/etf/xlk/">XLK</a>, <a href="https://stockanalysis.com/etf/smh/">SMH</a>, <a href="https://stockanalysis.com/stocks/msft/">MSFT</a>, <a href="https://stockanalysis.com/stocks/nvda/">NVDA</a>, <a href="https://stockanalysis.com/stocks/rklb/">RKLB</a>, <a href="https://stockanalysis.com/stocks/ionq/">IONQ</a>, <a href="https://stockanalysis.com/etf/arkk/">ARKK</a>, <a href="https://stockanalysis.com/stocks/pltr/">PLTR</a>, <a href="https://stockanalysis.com/etf/tqqq/">TQQQ</a>, <a href="https://stockanalysis.com/etf/soxl/">SOXL</a></li>
+    <li>Tech climate: <a href="https://finance.yahoo.com/markets/article/tech-stocks-havent-been-this-cheap-since-openai-launched-chatgpt-132800172.html">Yahoo Finance (Sept 21)</a>; <a href="https://www.htx.com/en-in/news/ubs-research-report-analysis-us-tech-volatility-returns-to-b-blgpSa3e/">UBS HOLT summary (Sept 22)</a>; <a href="https://www.ishares.com/us/insights/inside-the-market/investment-directions-market-outlook">iShares Fall 2026 outlook</a>; <a href="https://financialpost.com/investing/ai-skeptics-surrender-traders-eye-path-tech">Financial Post (Sept 23)</a>; <a href="https://www.reuters.com/commentary/reuters-open-interest/why-bulls-have-an-edge-ai-bubble-debate-marty-fridson-2026-09-17/">Reuters (Sept 17)</a>; <a href="https://www.fool.com/investing/2026/09/20/if-the-ai-bubble-bursts-as-the-dot-com-did-history-says-the-qqq-might-not-recover-until-2042/">Motley Fool (Sept 20)</a>; <a href="https://todaymarkets.ae/talking-nasdaq-is-it-overvalued/">Today Markets (Sept 22)</a></li>
+  </ul>
+</section>
+
+<footer>Built for Sam. Static site, no tracking, all math runs in your browser. Not financial advice; past returns don't promise future ones.</footer>
+</main>
+<script src="model.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
