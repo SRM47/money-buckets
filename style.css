@@ -39,3 +39,16 @@ a{color:#79c0ff}
 ul{padding-left:20px}li{margin:4px 0}
 .assump input{width:74px;padding:4px 6px;font-size:14px}
 footer{color:var(--mut);font-size:12px;padding:20px 0 40px}
+.tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:4px;vertical-align:middle}
+.tag.model{background:#1f6feb33;color:#79c0ff;border:1px solid #1f6feb}
+.tag.hist{background:#d2992233;color:#e3b341;border:1px solid #9e6a03}
+table.mtx input{width:56px}
+table.mtx td,table.mtx th{text-align:center}
+td.mirror{color:#8b949e}
+table.hist td{white-space:nowrap}
+table.hist td:first-child{white-space:normal;min-width:130px}
+details summary{cursor:pointer;list-style:none}
+details summary::-webkit-details-marker{display:none}
+details summary h2::after{content:"  ▸ tap to open";font-size:13px;color:#8b949e;font-weight:400}
+details[open] summary h2::after{content:"  ▾"}
+pre{white-space:pre-wrap;overflow-x:auto;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px;font-size:13px;line-height:1.5}
