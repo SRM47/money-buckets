@@ -84,7 +84,8 @@
   // ---- fan chart (SVG, no libraries) ----
   function drawChart(st) {
     const svg = $("#chart");
-    const W = 900, H = 380, L = 58, R = 16, T = 14, Bm = 30;
+    const narrow = (svg.clientWidth || window.innerWidth) < 600;
+    const W = narrow ? 420 : 900, H = narrow ? 300 : 380, L = narrow ? 44 : 58, R = 10, T = 12, Bm = 26;
     const years = +$("#horizon").value;
     const pts = [];
     for (let t = 0; t <= years; t += years > 20 ? 1 : 0.5) pts.push([t, M.project(start, st, t)]);
@@ -96,7 +97,7 @@
     let g = "";
     const step = niceStep(ymax / 5);
     for (let v = 0; v <= ymax; v += step) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#30363d"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmtK(v)}</text>`;
-    const xs = years <= 10 ? 1 : years <= 20 ? 2 : 5;
+    const xs = narrow ? (years <= 10 ? 2 : 5) : (years <= 10 ? 1 : years <= 20 ? 2 : 5);
     for (let t = 0; t <= years; t += xs) g += `<text x="${x(t)}" y="${H - 10}" text-anchor="middle">${t}y</text>`;
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.innerHTML = g +
@@ -141,6 +142,7 @@
     $("#dial").value = guessDial(alloc);
     document.querySelector('.preset[data-id="sam"]').classList.add("on");
     render();
+    window.addEventListener("resize", render);
   }
   document.addEventListener("DOMContentLoaded", init);
 })();
