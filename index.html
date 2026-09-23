@@ -51,6 +51,98 @@
   <p class="note"><b>Expected value vs typical:</b> the mean gets pulled up by rare huge wins. The more extreme-risk you hold, the further the typical outcome falls below the expected value. With 100% extreme risk the model's EV looks great while the median is roughly flat and about half of paths lose money. That gap is the whole lesson of gambling money.</p>
 </section>
 
+<section class="card" id="analytics">
+  <h2>Risk analytics for this mix</h2>
+  <p class="note"><span class="tag model">MODEL</span> Computed live from the assumptions and correlation matrix below. One-year numbers unless marked. Dollar figures use your starting amount. r<sub>f</sub> = the HYSA assumption.</p>
+  <div class="stats">
+    <div class="stat"><small>E[r<sub>p</sub>] = w&#7488;&mu;</small><b id="an-mu"></b></div>
+    <div class="stat"><small>Median return</small><b id="an-med"></b></div>
+    <div class="stat"><small>&sigma;<sub>p</sub> = &radic;(w&#7488;&Sigma;w)</small><b id="an-sig"></b></div>
+    <div class="stat"><small>Sharpe (&mu;<sub>p</sub>&minus;r<sub>f</sub>)/&sigma;<sub>p</sub></small><b id="an-sharpe"></b></div>
+    <div class="stat"><small>VaR 95%, 1y (lognormal)</small><b id="an-var95"></b></div>
+    <div class="stat"><small>VaR 99%, 1y (lognormal)</small><b id="an-var99"></b></div>
+    <div class="stat"><small>Expected shortfall / CVaR 95%</small><b id="an-es95"></b></div>
+    <div class="stat"><small>Expected shortfall / CVaR 99%</small><b id="an-es99"></b></div>
+    <div class="stat"><small>VaR 95%, parametric normal</small><b id="an-nvar95"></b></div>
+    <div class="stat"><small>P(losing year)</small><b id="an-ploss"></b></div>
+    <div class="stat"><small>1y return 5th / 95th pct</small><b id="an-p05"></b></div>
+    <div class="stat"><small>Skewness of 1y return</small><b id="an-skew"></b></div>
+    <div class="stat"><small>Max drawdown over <span id="an-hz"></span>y, median (Monte Carlo)</small><b id="an-mdd"></b></div>
+    <div class="stat"><small>Max drawdown, 95th pct</small><b id="an-mdd95"></b></div>
+    <div class="stat"><small>P(drawdown &ge; 20% at some point)</small><b id="an-pdd20"></b></div>
+  </div>
+  <p class="note">"none (gain)" means that even the 5th or 1st percentile outcome is above your starting value, e.g. 100% HYSA. VaR and ES are losses from the start value over one year. The drawdown stats use 2,000 simulated monthly paths over the horizon on the fan chart slider, fixed seed.</p>
+
+  <h3>Where the risk comes from (Euler risk contributions)</h3>
+  <div class="scroll"><table id="rc"></table></div>
+  <p class="note">RC<sub>i</sub> = w<sub>i</sub>(&Sigma;w)<sub>i</sub>/&sigma;<sub>p</sub>, and they add up to &sigma;<sub>p</sub>. A 10% extreme sleeve usually carries a far bigger share of the risk than of the money.</p>
+
+  <h3>Correlation matrix (editable)</h3>
+  <p class="note">Edit the upper triangle; the lower mirrors it. Compare with the historical correlations further down.</p>
+  <div class="scroll" id="corr"></div>
+  <div class="warn" id="psdWarn" style="display:none">This correlation matrix is not positive semi-definite, so it can't come from any real set of assets. Portfolio volatility may be wrong. Nudge the numbers toward each other.</div>
+  <h3>Covariance matrix &Sigma;<sub>ij</sub> = &rho;<sub>ij</sub>&sigma;<sub>i</sub>&sigma;<sub>j</sub></h3>
+  <div class="scroll"><table id="cov" class="mtx"></table></div>
+</section>
+
+<section class="card" id="bucketstats">
+  <h2>Per-bucket numbers</h2>
+  <p class="note"><span class="tag model">MODEL</span> Forward-looking, from the editable assumptions. 1+R ~ lognormal fit to each bucket's &mu; and &sigma;.</p>
+  <div class="scroll"><table id="bk-model"></table></div>
+
+  <h3>What history says <span class="tag hist">HISTORICAL</span></h3>
+  <p class="note">Calendar-year returns for a proxy of each bucket. HYSA proxy = 3-month T-bills. Low = S&amp;P 500 (total return). Medium = QQQ (price only, so about 0.5-1%/yr of dividends is missing; 1999 counts from the March launch). Extreme A = US bottom-decile small caps. Extreme B = ARKK (only 11 years, so treat it as a story, not a statistic). Sources: Damodaran (NYU Stern), slickcharts, Yahoo Finance; links at the bottom.</p>
+  <p class="note">On a phone, swipe the table sideways to see all five proxies.</p>
+  <div class="scroll"><table id="bk-hist" class="hist"></table></div>
+  <p class="note">Year-end data hides moves within a year. Measured monthly, the S&amp;P's 1929-32 fall was over 80% and QQQ's 2000-02 fall about 81%, so the drawdowns here are lower bounds. Look at the width of the confidence intervals: even with 98 years of data the S&amp;P's true mean is only pinned to about &plusmn;4 points, and the ARKK interval runs from negative to over 60%. That's why the model's assumptions are shaded, not copied from history.</p>
+  <h3>Historical correlations <span class="tag hist">HISTORICAL</span></h3>
+  <div class="scroll"><table id="hist-corr"></table></div>
+  <p class="note">Why the model's defaults differ: annual correlations from short windows are noisy, and correlations rise in crashes. The defaults (low-medium 0.85, low-extreme 0.6, medium-extreme 0.8) sit in the same range as these, leaning high on purpose.</p>
+</section>
+
+<section class="card">
+  <details id="math">
+    <summary><h2 style="display:inline">The model (math, for auditing)</h2></summary>
+    <h3>1. Buckets and portfolio moments</h3>
+    <p>Each bucket i has a one-year simple return R<sub>i</sub> with E[R<sub>i</sub>] = &mu;<sub>i</sub> and SD(R<sub>i</sub>) = &sigma;<sub>i</sub> (the editable assumptions). Weights w are reset to target once a year (annual rebalancing), so each year the portfolio return is R<sub>p</sub> = &Sigma;<sub>i</sub> w<sub>i</sub>R<sub>i</sub> with</p>
+    <pre>&mu;<sub>p</sub> = w&#7488;&mu;        &sigma;<sub>p</sub>&sup2; = w&#7488;&Sigma;w,   &Sigma;<sub>ij</sub> = &rho;<sub>ij</sub> &sigma;<sub>i</sub> &sigma;<sub>j</sub></pre>
+    <p>Worked check, 50% low / 50% medium: &sigma;<sub>p</sub> = &radic;(0.5&sup2;&middot;0.15&sup2; + 0.5&sup2;&middot;0.24&sup2; + 2&middot;0.5&middot;0.5&middot;0.85&middot;0.15&middot;0.24) = &radic;0.035325 = 18.79%. Set the sliders to 0/50/50/0 and the site shows the same.</p>
+    <h3>2. Lognormal fit (moment matching)</h3>
+    <p>1 + R<sub>p</sub> is modeled as lognormal, LN(m, s&sup2;), with parameters chosen to match the first two moments exactly:</p>
+    <pre>s&sup2; = ln(1 + &sigma;<sub>p</sub>&sup2; / (1+&mu;<sub>p</sub>)&sup2;)       m = ln(1+&mu;<sub>p</sub>) &minus; s&sup2;/2</pre>
+    <p>A weighted sum of lognormals is not exactly lognormal; this is the standard Fenton-Wilkinson style approximation. It keeps value above zero and gives the right-skew that makes mean &gt; median.</p>
+    <h3>3. Projection over T years</h3>
+    <p>Years are i.i.d., so ln(V<sub>T</sub>/V<sub>0</sub>) ~ N(mT, s&sup2;T):</p>
+    <pre>Percentile q:   V<sub>0</sub> &middot; exp(mT + z<sub>q</sub> s&radic;T),   z<sub>q</sub> = &Phi;&#8315;&sup1;(q)
+Median:         V<sub>0</sub> &middot; e<sup>mT</sup>
+Mean (EV):      V<sub>0</sub> &middot; (1+&mu;<sub>p</sub>)<sup>T</sup>
+P(V<sub>T</sub> &lt; V<sub>0</sub>):   &Phi;(&minus;m&radic;T / s)</pre>
+    <p>The fan chart bands are the 10-90 and 25-75 prediction intervals; the table adds 2.5 and 97.5 (a 95% prediction interval). These are intervals for outcomes given the parameters. They do not include uncertainty about the parameters themselves (see the confidence intervals in the historical table), so the real spread is wider.</p>
+    <h3>4. VaR, expected shortfall, and friends (1 year)</h3>
+    <pre>VaR<sub>&alpha;</sub>  = V<sub>0</sub> (1 &minus; e<sup>m + s z<sub>&alpha;</sub></sup>),            z<sub>0.05</sub> = &minus;1.645, z<sub>0.01</sub> = &minus;2.326
+ES<sub>&alpha;</sub>   = V<sub>0</sub> (1 &minus; e<sup>m + s&sup2;/2</sup> &Phi;(z<sub>&alpha;</sub> &minus; s) / &alpha;)
+Normal VaR<sub>&alpha;</sub> = V<sub>0</sub> (&minus;&mu;<sub>p</sub> &minus; z<sub>&alpha;</sub>&sigma;<sub>p</sub>)
+Sharpe = (&mu;<sub>p</sub> &minus; r<sub>f</sub>) / &sigma;<sub>p</sub>,  r<sub>f</sub> = HYSA &mu;
+Skew(LN) = (e<sup>s&sup2;</sup>+2)&radic;(e<sup>s&sup2;</sup>&minus;1)     ExKurt(LN) = e<sup>4s&sup2;</sup> + 2e<sup>3s&sup2;</sup> + 3e<sup>2s&sup2;</sup> &minus; 6</pre>
+    <p>ES follows from E[X&middot;1{X&lt;q}] = e<sup>m+s&sup2;/2</sup>&Phi;((ln q &minus; m &minus; s&sup2;)/s) for X ~ LN(m, s&sup2;), with ln q = m + s z<sub>&alpha;</sub>. I checked the closed form against 200,000 simulated draws (Sam's plan: VaR95 14.2% vs 14.1%, ES95 18.6% vs 18.7%). The normal VaR is shown because it's what a lot of desk models quote; it ignores skew and overstates loss for very volatile buckets (it can even exceed 100%).</p>
+    <h3>5. Max drawdown (Monte Carlo)</h3>
+    <p>2,000 paths, monthly log steps ~ N(m/12, s&sup2;/12) (continuous rebalancing, same annual distribution), xorshift RNG with fixed seed 12345 and Box-Muller normals. MDD = max<sub>t</sub>(1 &minus; V<sub>t</sub>/max<sub>u&le;t</sub>V<sub>u</sub>). The site reports the median and 95th percentile across paths and P(MDD &ge; 20%).</p>
+    <h3>6. Historical statistics</h3>
+    <pre>Sample SD with n&minus;1.  Skew G<sub>1</sub> = g<sub>1</sub>&radic;(n(n&minus;1))/(n&minus;2).  Excess kurtosis G<sub>2</sub> = ((n+1)g<sub>2</sub> + 6)(n&minus;1)/((n&minus;2)(n&minus;3)).
+95% CI on the mean = x&#772; &plusmn; 1.96 s/&radic;n.  CAGR = (&prod;(1+R<sub>t</sub>))<sup>1/n</sup> &minus; 1.
+Sharpe = mean(R&minus;T) / sd(R&minus;T).  Sortino = mean(R&minus;T) / &radic;(mean(min(R&minus;T,0)&sup2;)),  T = T-bill return that year.
+Beta = &rho; &middot; s<sub>asset</sub>/s<sub>S&amp;P</sub> on overlapping years.  Percentiles by linear interpolation.</pre>
+    <h3>7. What the model leaves out</h3>
+    <ul>
+      <li>Fat tails beyond lognormal. Real crashes (1929, 2008) come more often than a lognormal says, so VaR/ES here are optimistic in the tails.</li>
+      <li>Parameter uncertainty and regime changes. &mu; is the hardest number in finance to estimate.</li>
+      <li>Correlations that jump toward 1 in a crisis; serial correlation (momentum, mean reversion).</li>
+      <li>Taxes, fees, inflation (all numbers are nominal), and the daily-reset decay of leveraged ETFs.</li>
+      <li>HYSA rates change with the Fed; 0.5% volatility is a stand-in for rate drift, not for loss risk (FDIC-insured).</li>
+    </ul>
+  </details>
+</section>
+
 <section class="card">
   <h2>Example portfolios</h2>
   <p class="note">Tap one to load it. Percentages are HYSA / low / medium / extreme. Dollar outcomes use your starting amount.</p>
@@ -76,7 +168,7 @@
 
 <section class="card">
   <h2>Assumptions</h2>
-  <p class="note">Edit these and everything above updates. Returns are nominal (before inflation and taxes), yearly. Buckets are assumed rebalanced yearly. Outcomes use a lognormal model fit to each mix's mean and volatility. Correlations: low/medium 0.85, low/extreme 0.6, medium/extreme 0.8, cash 0.</p>
+  <p class="note">Edit these and everything above updates. Returns are nominal (before inflation and taxes), yearly. Buckets are assumed rebalanced yearly. Outcomes use a lognormal model fit to each mix's mean and volatility. Correlations default to low/medium 0.85, low/extreme 0.6, medium/extreme 0.8, cash 0, and can be edited in the correlation matrix under Risk analytics.</p>
   <div class="scroll" id="assump"></div>
   <button id="reset" class="preset" style="margin-top:10px;width:auto">Reset to defaults</button>
   <h3>Why these numbers</h3>
@@ -140,6 +232,40 @@
     <tr><td>SOXL</td><td>3x daily semiconductors</td><td>price not current</td><td>5.71</td><td>The most volatile thing on this page. Can halve in weeks.</td></tr>
   </table></div>
 
+  <h3>Top growth stocks right now (Yahoo Finance screens)</h3>
+  <p class="note">From Yahoo Finance's "Growth Technology Stocks" screen (revenue growth over 25% and EPS growth over 25%), pulled Sept 23, 2026 around 2:53pm PT. Prices are intraday at that moment. Revenue growth is the latest quarter vs a year ago. A screen is a list of what's been growing fast, not a list of buys: fast growth is usually already in the price.</p>
+  <div class="scroll"><table>
+    <tr><th>Ticker</th><th>What</th><th>Price</th><th>Mkt cap</th><th>P/E (TTM)</th><th>Rev growth q/q-yr</th><th>EPS growth 1y</th><th>52-wk range</th><th>Bucket</th></tr>
+    <tr><td>NVDA</td><td>Nvidia</td><td>$224.41</td><td>$5.42T</td><td>27.9</td><td>106%</td><td>125%</td><td>$164-237</td><td class="med">Medium</td></tr>
+    <tr><td>AVGO</td><td>Broadcom (AI networking chips)</td><td>$367.24</td><td>$1.75T</td><td>61.6</td><td>48%</td><td>125%</td><td>$290-495</td><td class="med">Medium</td></tr>
+    <tr><td>TSM</td><td>Taiwan Semiconductor</td><td>$415.50</td><td>$2.16T</td><td>28.1</td><td>36%</td><td>53%</td><td>$230-479</td><td class="med">Medium</td></tr>
+    <tr><td>MU</td><td>Micron (memory)</td><td>$956.08</td><td>$1.08T</td><td>21.6</td><td>346%</td><td>706%</td><td>$119-1,255</td><td class="med">Medium/extreme</td></tr>
+    <tr><td>AMD</td><td>AMD</td><td>$457.06</td><td>$746B</td><td>120.2</td><td>50%</td><td>125%</td><td>$149-585</td><td class="med">Medium/extreme</td></tr>
+    <tr><td>PLTR</td><td>Palantir</td><td>$169.46</td><td>$407B</td><td>159.4</td><td>93%</td><td>288%</td><td>$106-208</td><td class="high">Extreme</td></tr>
+    <tr><td>ALAB</td><td>Astera Labs (AI data-center connectivity)</td><td>$274.13</td><td>$47.6B</td><td>146.3</td><td>104%</td><td>240%</td><td>$98-499</td><td class="high">Extreme</td></tr>
+    <tr><td>NET</td><td>Cloudflare</td><td>$272.74</td><td>$97.1B</td><td>n/a (loss)</td><td>36%</td><td>73%</td><td>$159-332</td><td class="high">Extreme</td></tr>
+    <tr><td>IONQ</td><td>IonQ (quantum)</td><td>$37.64</td><td>$15.2B</td><td>n/a (loss)</td><td>287%</td><td>96%</td><td>$25.89-84.64</td><td class="high">Extreme</td></tr>
+    <tr><td>ASTS</td><td>AST SpaceMobile (satellite-to-phone)</td><td>$62.40</td><td>$18.7B</td><td>n/a (loss)</td><td>2,627% (tiny base)</td><td>26%</td><td>$36-134</td><td class="high">Extreme</td></tr>
+  </table></div>
+  <p class="note">Yahoo's "Undervalued Growth Stocks" screen (low PEG) is a different flavor: Nu Holdings (NU, P/E 19.8, PEG 0.66) and Super Micro (SMCI, P/E 11.5, PEG 0.11) topped it the same day. A very low PEG often means the market doubts the growth will last.</p>
+
+  <h3>Emerging tech themes</h3>
+  <ul>
+    <li><b>Memory "supercycle".</b> AI servers need huge amounts of high-bandwidth memory. The growth screen shows it: Micron revenue +346% yoy, SK hynix +257%, Western Digital +44%. Memory is historically the most boom-bust corner of chips, so a peak here can reverse hard (MU trades 24% below its 52-week high already).</li>
+    <li><b>AI data-center plumbing.</b> Networking and connectivity (Broadcom, Astera Labs, Amphenol +55% revenue, Celestica +62%). Less crowded than Nvidia itself, but priced richly (ALAB at 146x trailing earnings).</li>
+    <li><b>Quantum computing.</b> IonQ just announced its 256-qubit system will power an Nvidia quantum research center (IonQ press release, Sept 23). Revenue is growing fast from a small base and the companies lose money. Pure extreme-bucket stuff.</li>
+    <li><b>Space.</b> AST SpaceMobile, Rocket Lab. Launch failures and funding needs make these binary.</li>
+    <li><b>Robotics.</b> Amplify launched concentrated "Top 10" ETFs on quantum (XQBT), space (XWNG), robotics (ROBX) and Asia memory (AHBM) this month, a sign of how much money is chasing these themes. New thematic ETFs often launch near peaks of enthusiasm.</li>
+  </ul>
+
+  <h3>Technicals snapshot (Nasdaq-100, Sept 22-23)</h3>
+  <ul>
+    <li>The index cleared 30,788 to fresh records and its 14-day RSI hit 81, well into overbought (above 70). That usually comes before at least a pause, not necessarily a drop (WalletInvestor, Sept 22).</li>
+    <li>IG calls the short-term trend bullish while it holds above the Sept 18 low of 29,372, and medium-term bullish above 28,753. Old resistance around 30,195-30,329 should now act as support.</li>
+    <li>StockCharts (Sept 23): the Nasdaq-100 and Composite lead all major US indexes vs their 200-day moving averages. SMH (semis) just had its 21-day EMA cross back above the 50-day SMA with the PPO turning positive.</li>
+    <li>Plain read: momentum is strong and stretched. For a buy-and-hold core this doesn't change much; for the extreme sleeve it argues for buying in pieces over a few months rather than all at once.</li>
+  </ul>
+
   <h3>Tech right now (Sept 2026), the honest read</h3>
   <ul>
     <li><b>Prices are near records again.</b> The Nasdaq-100 hit its first record since June this week, after a September sell-off. Half of one recent 5-day run came from just five stocks (Financial Post, Sept 23).</li>
@@ -159,11 +285,16 @@
     <li>Leveraged ETF decay: <a href="https://www.sec.gov/investor/pubs/leveragedetfs-alert.htm">SEC investor alert</a></li>
     <li>Prices, betas, P/E, yields: stockanalysis.com pages for <a href="https://stockanalysis.com/etf/voo/">VOO</a>, <a href="https://stockanalysis.com/etf/vti/">VTI</a>, <a href="https://stockanalysis.com/etf/schd/">SCHD</a>, <a href="https://stockanalysis.com/stocks/cost/">COST</a>, <a href="https://stockanalysis.com/stocks/ko/">KO</a>, <a href="https://stockanalysis.com/stocks/pg/">PG</a>, <a href="https://stockanalysis.com/stocks/wmt/">WMT</a>, <a href="https://stockanalysis.com/stocks/jnj/">JNJ</a>, <a href="https://stockanalysis.com/etf/qqq/">QQQ</a>, <a href="https://stockanalysis.com/etf/xlk/">XLK</a>, <a href="https://stockanalysis.com/etf/smh/">SMH</a>, <a href="https://stockanalysis.com/stocks/msft/">MSFT</a>, <a href="https://stockanalysis.com/stocks/nvda/">NVDA</a>, <a href="https://stockanalysis.com/stocks/rklb/">RKLB</a>, <a href="https://stockanalysis.com/stocks/ionq/">IONQ</a>, <a href="https://stockanalysis.com/etf/arkk/">ARKK</a>, <a href="https://stockanalysis.com/stocks/pltr/">PLTR</a>, <a href="https://stockanalysis.com/etf/tqqq/">TQQQ</a>, <a href="https://stockanalysis.com/etf/soxl/">SOXL</a></li>
     <li>Tech climate: <a href="https://finance.yahoo.com/markets/article/tech-stocks-havent-been-this-cheap-since-openai-launched-chatgpt-132800172.html">Yahoo Finance (Sept 21)</a>; <a href="https://www.htx.com/en-in/news/ubs-research-report-analysis-us-tech-volatility-returns-to-b-blgpSa3e/">UBS HOLT summary (Sept 22)</a>; <a href="https://www.ishares.com/us/insights/inside-the-market/investment-directions-market-outlook">iShares Fall 2026 outlook</a>; <a href="https://financialpost.com/investing/ai-skeptics-surrender-traders-eye-path-tech">Financial Post (Sept 23)</a>; <a href="https://www.reuters.com/commentary/reuters-open-interest/why-bulls-have-an-edge-ai-bubble-debate-marty-fridson-2026-09-17/">Reuters (Sept 17)</a>; <a href="https://www.fool.com/investing/2026/09/20/if-the-ai-bubble-bursts-as-the-dot-com-did-history-says-the-qqq-might-not-recover-until-2042/">Motley Fool (Sept 20)</a>; <a href="https://todaymarkets.ae/talking-nasdaq-is-it-overvalued/">Today Markets (Sept 22)</a></li>
+    <li>Growth screens: <a href="https://finance.yahoo.com/research-hub/screener/growth_technology_stocks/">Yahoo Finance, Growth Technology Stocks</a>; <a href="https://finance.yahoo.com/research-hub/screener/undervalued_growth_stocks/">Yahoo Finance, Undervalued Growth Stocks</a> (both pulled Sept 23, 2026)</li>
+    <li>ARKK annual returns: <a href="https://finance.yahoo.com/quote/ARKK/performance/">Yahoo Finance, ARKK performance</a>; cross-checked with <a href="https://www.aaii.com/etf/ticker/ARKK">AAII</a></li>
+    <li>Emerging themes: <a href="https://blog.amplifyetfs.com/insights/top-10-etfs-a-high-conviction-approach-to-innovation-themes-etf-watch-video">Amplify ETFs (Sept 22)</a>; <a href="https://www.ionq.com/news/ionq-to-advance-quantum-supercomputing-by-bringing-first-qpu-to-nvidia-accelerated-quantum-research-center">IonQ press release (Sept 23)</a></li>
+    <li>Technicals: <a href="https://walletinvestor.com/news/trading-news/nasdaq-100-sets-records-on-meta-and-chip-rally-then-hits-overbought-rsi-above-80/">WalletInvestor (Sept 22)</a>; <a href="https://www.ig.com/uk/news-and-trade-ideas/nasdaq-100-rallies-strongly-as-usd-jpy-brent-crude-rise-too-260922">IG (Sept 22)</a>; <a href="https://articles.stockcharts.com/article/nasdaq-hits-new-highs-is-rally-broad-enough/">StockCharts (Sept 23)</a></li>
   </ul>
 </section>
 
 <footer>Built for Sam. Static site, no tracking, all math runs in your browser. Not financial advice; past returns don't promise future ones.</footer>
 </main>
+<script src="data.js"></script>
 <script src="model.js"></script>
 <script src="app.js"></script>
 </body>
