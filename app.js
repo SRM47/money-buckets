@@ -16,6 +16,9 @@
   let alloc = { ...PRESETS[2].a };
   let A = JSON.parse(JSON.stringify(M.DEFAULTS));
   let start = 30000;
+  let C = JSON.parse(JSON.stringify(M.CORR));
+  const rf = () => A.hysa.mu;
+  const PS = a => M.portfolioFull(a, A, C);
 
   const $ = s => document.querySelector(s);
   const fmt = x => (x < 0 ? "-$" : "$") + Math.abs(Math.round(x)).toLocaleString("en-US");
@@ -55,7 +58,7 @@
 
   function buildPresets() {
     $("#presets").innerHTML = PRESETS.map(p => {
-      const st = M.portfolioStats(p.a, A), r10 = M.project(start, st, 10);
+      const st = PS(p.a), r10 = M.project(start, st, 10);
       return `<button class="preset" data-id="${p.id}">
         <b>${p.name}</b><small>${p.desc}</small>
         <div class="bar">${B.map(k => `<div style="width:${p.a[k]}%;background:${COLORS[k]}"></div>`).join("")}</div>
@@ -119,7 +122,7 @@
     $("#dialLabel").textContent = d + " · " + dialWord(d);
     $("#allocBar").innerHTML = B.map(k => `<div style="width:${alloc[k]}%;background:${COLORS[k]}" title="${NAMES[k]} ${alloc[k]}%"></div>`).join("");
 
-    const st = M.portfolioStats(alloc, A);
+    const st = PS(alloc);
     const y1 = M.project(start, st, 1);
     $("#st-mu").textContent = pct(st.mu);
     $("#st-med").textContent = pct(st.medianAnnual);
@@ -127,9 +130,109 @@
     $("#st-bad").textContent = fmt(M.project(start, st, 1).p10 - start);
     $("#st-bad").className = "";
 
-    $("#proj").innerHTML = `<tr><th>Year</th><th>Bad (10th pct)</th><th>Typical (median)</th><th>Expected value (mean)</th><th>Good (90th pct)</th><th>Chance of loss</th></tr>` +
-      HORIZONS.map(T => { const r = M.project(start, st, T); return `<tr><td>${T}</td><td>${fmt(r.p10)}</td><td>${fmt(r.p50)}</td><td>${fmt(r.mean)}</td><td>${fmt(r.p90)}</td><td>${pct(r.pLoss, 0)}</td></tr>`; }).join("");
+    $("#proj").innerHTML = `<tr><th>Year</th><th>2.5th pct</th><th>Bad (10th)</th><th>Typical (median)</th><th>EV (mean)</th><th>Good (90th)</th><th>97.5th pct</th><th>P(loss)</th></tr>` +
+      HORIZONS.map(T => { const r = M.project(start, st, T); return `<tr><td>${T}</td><td>${fmt(r.p025)}</td><td>${fmt(r.p10)}</td><td>${fmt(r.p50)}</td><td>${fmt(r.mean)}</td><td>${fmt(r.p90)}</td><td>${fmt(r.p975)}</td><td>${pct(r.pLoss, 1)}</td></tr>`; }).join("");
     drawChart(st);
+    renderAnalytics(st);
+  }
+
+  // ---- analytics ----
+  const sgn = x => x <= 0 ? "none (gain)" : fmt(x);
+  const pctS = (x, d = 1) => x == null || !isFinite(x) ? "n/a" : (x * 100).toFixed(d) + "%";
+  const num = (x, d = 2) => x == null || !isFinite(x) ? "n/a" : x.toFixed(d);
+  let ddCache = { key: "", v: null };
+
+  function buildCorr() {
+    const box = $("#corr");
+    box.innerHTML = `<table class="mtx"><tr><th>&rho;</th>${B.map(k => `<th class="${k}">${NAMES[k]}</th>`).join("")}</tr>` +
+      B.map((i, a) => `<tr><th class="${i}">${NAMES[i]}</th>${B.map((j, b) => b === a ? `<td>1.00</td>` :
+        b > a ? `<td><input type="number" step="0.05" min="-1" max="1" data-i="${i}" data-j="${j}" value="${C[i][j].toFixed(2)}"></td>` :
+        `<td class="mirror" id="cm-${i}-${j}">${C[i][j].toFixed(2)}</td>`).join("")}</tr>`).join("") + `</table>`;
+    box.querySelectorAll("input").forEach(el => el.addEventListener("input", e => {
+      const v = parseFloat(e.target.value); if (isNaN(v) || v < -1 || v > 1) return;
+      const i = e.target.dataset.i, j = e.target.dataset.j; C[i][j] = C[j][i] = v;
+      $(`#cm-${j}-${i}`).textContent = v.toFixed(2); buildPresets(); render();
+    }));
+  }
+
+  function renderAnalytics(st) {
+    const R = M.riskFromFit(st.fit, rf());
+    const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+    set("#an-mu", pctS(R.mu, 2)); set("#an-med", pctS(R.median, 2)); set("#an-sig", pctS(R.sigma, 2));
+    set("#an-sharpe", R.sharpe == null ? "n/a (no risk)" : num(R.sharpe));
+    set("#an-var95", sgn(R.var95 * start)); set("#an-var99", sgn(R.var99 * start));
+    set("#an-es95", sgn(R.es95 * start)); set("#an-es99", sgn(R.es99 * start));
+    set("#an-nvar95", sgn(R.nvar95 * start));
+    set("#an-ploss", pctS(R.pLoss, 1)); set("#an-p05", pctS(R.p05, 1) + " / " + pctS(R.p95, 1));
+    set("#an-skew", num(R.skew));
+    const H = +$("#horizon").value;
+    const key = [st.m.toFixed(6), st.s2.toFixed(6), H].join("|");
+    if (ddCache.key !== key) ddCache = { key, v: st.fit.s > 1e-9 ? M.simulateDrawdown(st.fit, H, 2000, 12345) : { median: 0, p95: 0, pDD20: 0 } };
+    const D = ddCache.v;
+    set("#an-mdd", pctS(D.median, 0));
+    set("#an-mdd95", pctS(D.p95, 0)); set("#an-pdd20", pctS(D.pDD20, 0)); set("#an-hz", H);
+    $("#psdWarn").style.display = M.isPSD(C) ? "none" : "block";
+    // risk contributions
+    const w = k => alloc[k] / 100;
+    $("#rc").innerHTML = `<tr><th>Bucket</th><th>Weight</th><th>&sigma;<sub>i</sub></th><th>Contribution to &sigma;<sub>p</sub></th><th>% of risk</th></tr>` +
+      B.map(k => `<tr><td class="${k}">${NAMES[k]}</td><td>${pctS(w(k), 0)}</td><td>${pctS(A[k].sigma)}</td><td>${pctS(st.rc[k], 2)}</td><td>${st.sigma > 0 ? pctS(st.rc[k] / st.sigma, 0) : "n/a"}</td></tr>`).join("") +
+      `<tr><th>Total</th><th>100%</th><th></th><th>${pctS(st.sigma, 2)}</th><th>100%</th></tr>`;
+    // covariance matrix
+    const S = M.covMatrix(A, C);
+    $("#cov").innerHTML = `<tr><th>&Sigma; (&times;10&#8315;&#8308;)</th>${B.map(k => `<th class="${k}">${NAMES[k]}</th>`).join("")}</tr>` +
+      B.map(i => `<tr><th class="${i}">${NAMES[i]}</th>${B.map(j => `<td>${(S[i][j] * 1e4).toFixed(1)}</td>`).join("")}</tr>`).join("");
+    // per-bucket model table
+    const BR = M.bucketRisk(A, rf());
+    const rows = [
+      ["E[r] (arithmetic mean)", k => pctS(BR[k].mu)],
+      ["Volatility &sigma;", k => pctS(BR[k].sigma)],
+      ["Median r = e<sup>m</sup>&minus;1", k => pctS(BR[k].median)],
+      ["1st pct (1 in 100 bad year)", k => pctS(BR[k].p01)],
+      ["5th pct (lower bound, 90% band)", k => pctS(BR[k].p05)],
+      ["95th pct (upper bound, 90% band)", k => pctS(BR[k].p95)],
+      ["99th pct", k => pctS(BR[k].p99)],
+      ["P(losing year)", k => pctS(BR[k].pLoss)],
+      ["VaR 95% (1y, % of bucket)", k => BR[k].var95 <= 0 ? "none" : pctS(BR[k].var95)],
+      ["VaR 99%", k => BR[k].var99 <= 0 ? "none" : pctS(BR[k].var99)],
+      ["Expected shortfall 95%", k => BR[k].es95 <= 0 ? "none" : pctS(BR[k].es95)],
+      ["Sharpe (rf = HYSA)", k => BR[k].sharpe == null ? "n/a" : num(BR[k].sharpe)],
+      ["Skewness (lognormal)", k => num(BR[k].skew)],
+      ["Excess kurtosis (lognormal)", k => num(BR[k].exKurt)],
+      ["VaR 95% on your $ in it", k => { const d = start * alloc[k] / 100 * BR[k].var95; return d <= 0 ? "none" : fmt(d); }],
+    ];
+    $("#bk-model").innerHTML = `<tr><th>Model, 1 year</th>${B.map(k => `<th class="${k}">${NAMES[k]}</th>`).join("")}</tr>` +
+      rows.map(([lab, f]) => `<tr><td>${lab}</td>${B.map(k => `<td>${f(k)}</td>`).join("")}</tr>`).join("");
+  }
+
+  function renderHistory() {
+    const H = window.HIST;
+    const cols = [
+      ["tbill", "HYSA proxy", "hysa"], ["sp500", "Low proxy", "low"], ["qqq", "Medium proxy", "med"], ["smallcap", "Extreme proxy A", "high"], ["arkk", "Extreme proxy B", "high"],
+    ];
+    const S = {}; cols.forEach(([k]) => S[k] = M.histStats(H[k], k === "tbill" ? null : H.tbill, k === "sp500" ? null : H.sp500));
+    const rows = [
+      ["Period (years)", s => `${s.from}-${s.to} (${s.n})`],
+      ["Arithmetic mean", s => pctS(s.mean)],
+      ["95% CI on the mean (&plusmn;1.96 s/&radic;n)", s => `${pctS(s.ciLo)} to ${pctS(s.ciHi)}`],
+      ["CAGR (geometric)", s => pctS(s.cagr)],
+      ["Volatility (sample s.d.)", s => pctS(s.sd)],
+      ["Skewness (adj.)", s => num(s.skew)],
+      ["Excess kurtosis", s => num(s.exKurt)],
+      ["Worst year", s => `${pctS(s.min)} (${s.minYr})`],
+      ["Best year", s => `${pctS(s.max)} (${s.maxYr})`],
+      ["5th / 95th pct year", s => `${pctS(s.p05)} / ${pctS(s.p95)}`],
+      ["% of years negative", s => pctS(s.pctNeg, 0)],
+      ["Max drawdown (year-end data)", s => s.mdd > 0 ? `${pctS(s.mdd, 0)} (${s.mddFrom}-${s.mddTo})` : "0%"],
+      ["Sharpe vs T-bills", s => num(s.sharpe)],
+      ["Sortino vs T-bills", s => num(s.sortino)],
+      ["Beta vs S&amp;P 500", s => num(s.beta)],
+      ["Correlation vs S&amp;P 500", s => num(s.rho)],
+    ];
+    $("#bk-hist").innerHTML = `<tr><th>Historical</th>${cols.map(([k, lab, b]) => `<th class="${b}">${lab}<br><small>${H[k].label}</small></th>`).join("")}</tr>` +
+      rows.map(([lab, f]) => `<tr><td>${lab}</td>${cols.map(([k]) => `<td>${f(S[k])}</td>`).join("")}</tr>`).join("");
+    const pairs = [["sp500", "qqq"], ["sp500", "smallcap"], ["sp500", "arkk"], ["qqq", "smallcap"], ["qqq", "arkk"], ["tbill", "sp500"]];
+    $("#hist-corr").innerHTML = `<tr><th>Pair</th><th>&rho; (annual)</th><th>Overlap</th></tr>` +
+      pairs.map(([a, b]) => { const c = M.corrAligned(H[a], H[b]); return `<tr><td>${H[a].label} vs ${H[b].label}</td><td>${num(c.rho)}</td><td>${c.from}-2025 (n=${c.n})</td></tr>`; }).join("");
   }
 
   function init() {
@@ -138,7 +241,8 @@
     $("#start").addEventListener("input", e => { const v = parseFloat(e.target.value); if (v > 0) { start = v; buildPresets(); render(); } });
     $("#dial").addEventListener("input", e => { alloc = M.dialToAlloc(+e.target.value); clearPreset(); render(); });
     $("#horizon").addEventListener("input", e => { $("#hLabel").textContent = e.target.value + " years"; render(); });
-    $("#reset").addEventListener("click", () => { A = JSON.parse(JSON.stringify(M.DEFAULTS)); buildAssumptions(); buildPresets(); render(); });
+    $("#reset").addEventListener("click", () => { A = JSON.parse(JSON.stringify(M.DEFAULTS)); C = JSON.parse(JSON.stringify(M.CORR)); buildAssumptions(); buildCorr(); buildPresets(); render(); });
+    buildCorr(); renderHistory();
     $("#dial").value = guessDial(alloc);
     document.querySelector('.preset[data-id="sam"]').classList.add("on");
     render();
